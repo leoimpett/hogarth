@@ -1,0 +1,1 @@
+C:\Utils\ImageMagick\magick.exe identify -format "%%f,%%w,%%h " full\*.jpg >sizes.txt
