@@ -1,7 +1,7 @@
-import type {Data} from "./data";
+import type { Data } from "./data";
 import { SeedRandom } from "./seedRandom";
 
-class Box{
+class Box {
     public ID: number;
     public X: number;
     public Y: number;
@@ -9,10 +9,10 @@ class Box{
     public Height: number;
     public ImageFilename: string;
     public $Image: JQuery<HTMLElement>;
-    
-    public constructor(id: number, x: number, y: number, width: number, height: number, imageFilename: string, $image: JQuery<HTMLElement>){
+
+    public constructor(id: number, x: number, y: number, width: number, height: number, imageFilename: string, $image: JQuery<HTMLElement>) {
         this.ID = id;
-        this.X =x;
+        this.X = x;
         this.Y = y;
         this.Width = width;
         this.Height = height;
@@ -23,49 +23,68 @@ class Box{
 
 export class Drawing {
 
+    private readonly unit = "em";
     private data: Data;
     private $body: JQuery<HTMLElement>;
-    private boxes: Box[]; 
-    
-    public constructor(data: Data){
+    private boxes: Box[];
+
+    public constructor(data: Data) {
         this.data = data;
-        this.$body = $("body");
+        this.$body = $("#imagemap");
         this.boxes = [];
     }
 
     public Run() {
-        this.drawBox(101, 45, 25, 12);
-        this.drawBox(501, 70, 70, 12);
-        this.drawBox(301, 25, 110, 12);
-        this.drawBox(401, 20, 70, 12);
-        while (this.drawRelated(7)) { }
+        let size = 6;
+        for (let i = 0; i < this.data.Records.length; i++) {
+            let record = this.data.Records[i];
+            if (record?.IsPrimaryImage) {
+                if(record.Drawn) {
+                    console.log(`${record.ID} (${record.ImageFileName}) already drawn`)
+                    continue;
+                }
+                this.drawBox(record.ID, record.StartX, record.StartY, size);
+                while (this.drawRelated(record.Seed)) { }
+            }
+        }
+
+        for (let i = 0; i < this.data.Records.length; i++) {
+            let record = this.data.Records[i];
+            if (record && !record.Drawn) {
+                console.log(`${record.ID} (${record.ImageFileName}) not linked`);
+            }
+        }
     }
 
-    private drawBox(id: number, x: number, y: number, size: number){
-        var w = size;
-        var h = size;
-        var d = this.data.GetDataRecord(id);
+    private drawBox(id: number, x: number, y: number, size: number) {
+        let w = size;
+        let h = size;
+        let d = this.data.GetDataRecord(id);
 
         if (!d) return;
 
-        var filename = d.ImageFileName.toLowerCase();
-        filename = filename.replace(/\.[^.]{1,4}$/, "");
-        filename = filename.replace(/[^a-zA-Z0-9]+/g, "-");
-        filename = filename + ".jpg";
+        let originalFilename = d.ImageFileName;
+        let filename = originalFilename.toLowerCase()
+            .replace(/\.[^.]{1,4}$/, "")
+            .replace(/[^a-zA-Z0-9]+/g, "-")
+            + ".jpg";
 
-        var i = this.data.GetDataImage(filename);
-        if (i){
-            var newSize = this.boxResize(i.Width, i.Height, size); 
+        let i = this.data.GetDataImage(filename);
+        if (i) {
+            let newSize = this.boxResize(i.Width, i.Height, size);
             w = newSize.Width;
             h = newSize.Height;
+        } else {
+            console.log(originalFilename + " not found (" + filename + ")");
+            filename = "../error.png";
         }
 
-        var $img = this.$newImage(filename, w, h);
-        $img.css("left", x + "vw");
-        $img.css("top", y + "vw");
+        let $img = this.$newImage(d.Title, filename, w, h);
+        $img.css("left", x + this.unit);
+        $img.css("top", y + this.unit);
         this.$body.append($img);
-
         this.boxes.push(new Box(id, x, y, w, h, filename, $img))
+        d.Drawn = true;
     }
 
     private drawRelated(seed: number) {
@@ -73,18 +92,18 @@ export class Drawing {
         let deg2rad = Math.PI / 180;
         let rad2deg = 180 / Math.PI;
 
-        for (var i = 0; i < this.data.Related.length; i++) {
-            var relatedPair = this.data.Related[i];
+        for (let i = 0; i < this.data.Related.length; i++) {
+            let relatedPair = this.data.Related[i];
             if (!relatedPair) continue;
 
-            var boxA = this.getBox(relatedPair.A);
-            var boxB = this.getBox(relatedPair.B);
+            let boxA = this.getBox(relatedPair.A);
+            let boxB = this.getBox(relatedPair.B);
 
             // Check if only 1 box present
             if ((boxA ? 1 : 0) + (boxB ? 1 : 0) != 1) continue;
 
-            var startBox = null;
-            var relatedId = 0;
+            let startBox = null;
+            let relatedId = 0;
             if (boxA) {
                 startBox = boxA;
                 relatedId = relatedPair.B;
@@ -95,15 +114,15 @@ export class Drawing {
 
             if (!startBox) continue;
 
-            var angle = rnd.Next() * 360;
-            var anglePlus = 0;
-            var distanceStep = (startBox.Width + startBox.Height) / 1.5;
-            var distance = distanceStep;
+            let angle = rnd.Next() * 360;
+            let anglePlus = 0;
+            let distanceStep = (startBox.Width + startBox.Height) / 1.5;
+            let distance = distanceStep;
             while (true) {
-                var radAngle = (angle + anglePlus) * deg2rad;
-                var candidateX = startBox.X + Math.sin(radAngle) * distance;
-                var candidateY = startBox.Y + Math.cos(radAngle) * distance;
-                var overlapping = this.checkOverlappingBox(candidateX, candidateY);
+                let radAngle = (angle + anglePlus) * deg2rad;
+                let candidateX = startBox.X + Math.sin(radAngle) * distance;
+                let candidateY = startBox.Y + Math.cos(radAngle) * distance;
+                let overlapping = this.checkOverlappingBox(candidateX, candidateY, startBox.Width, startBox.Height);
                 if (overlapping) {
                     anglePlus += 10;
                     if (anglePlus > 350) {
@@ -113,36 +132,39 @@ export class Drawing {
                     continue;
                 }
 
-                var line = this.getDistanceAndRotation(startBox.X, startBox.Y, candidateX, candidateY);
-                var $line = $("<div class='line'></div>");
-                $line.css("left", line.MidpointX + "vw");
-                $line.css("top", line.MidpointY + "vw");
-                $line.css("width", (line.Distance) + "vw");
-                $line.css("margin-left", (line.Distance / -2) + "vw");
+                let line = this.getDistanceAndRotation(startBox.X, startBox.Y, candidateX, candidateY);
+                let $line = $("<div class='line'></div>");
+                $line.css("left", line.MidpointX + this.unit);
+                $line.css("top", line.MidpointY + this.unit);
+                $line.css("width", (line.Distance) + this.unit);
+                $line.css("margin-left", (line.Distance / -2) + this.unit);
                 $line.css("transform", "rotate(" + (line.RotationRadians * rad2deg) + "deg)")
                 this.$body.append($line);
 
-                this.drawBox(relatedId, candidateX, candidateY, 8);
+                this.drawBox(relatedId, candidateX, candidateY, 6);
                 return true;
             }
         }
         return false;
     }
 
-    
+
     private getBox(id: number) {
-        for (var i = 0; i < this.boxes.length; i++) {
+        for (let i = 0; i < this.boxes.length; i++) {
             if (this.boxes[i]?.ID == id) return this.boxes[i];
         }
         return null;
     }
 
-    private checkOverlappingBox(x: number, y: number) {
-        for (var i = 0; i < this.boxes.length; i++) {
-            var box = this.boxes[i];
+    private checkOverlappingBox(x: number, y: number, width: number, height: number) {
+
+        if (x - width / 2 < 0 || y - height / 2 < 0) return true;
+
+        for (let i = 0; i < this.boxes.length; i++) {
+            let box = this.boxes[i];
             if (!box) continue;
-            var w = box.Width * 1.1;
-            var h = box.Height * 1.1;
+            let w = (box.Width + width) * 0.55;
+            let h = (box.Height + height) * 0.55;
             if (x > (box.X - w) && x < (box.X + w) && y > (box.Y - h) && y < (box.Y + h)) {
                 return true;
             }
@@ -195,7 +217,24 @@ export class Drawing {
         };
     }
 
-    private $newImage(url:string, w:number, h:number) {
-        return $("<img src='img/500/"+url+"' style='width:"+w+"vw;height:"+h+"vw;margin:-"+(h/2)+"vw 0 0 -"+(w/2)+"vw; position:absolute' />");
+    private $newImage(title: string, url: string, w: number, h: number) {
+        var $div = $("<div />");
+        $div.addClass("im");
+        $div.css({
+            width: w + this.unit,
+            height: h + this.unit,
+            marginLeft: (-w / 2) + this.unit,
+            marginTop: (-h / 2) + this.unit,
+        });
+        var $img = $("<img />");
+        $img.attr({
+            src: "img/500/" + url,
+            draggable: "false",
+            alt: title
+        });
+        $div.append($img);
+        $div.append("<div class='c'>" + title + "</div>");
+
+        return $div;
     }
 }
